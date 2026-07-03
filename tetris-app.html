@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>TETRIS</title>
+<!-- Mode application plein écran : iPhone (Safari) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tetris">
+<!-- Mode application plein écran : Android (Chrome/Samsung Internet) -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#10131a">
+<!-- Icône écran d'accueil embarquée (SVG, aucune dépendance externe) -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='36' fill='%2310131a'/%3E%3Crect x='30' y='66' width='36' height='36' rx='5' fill='%233ec6e0'/%3E%3Crect x='72' y='66' width='36' height='36' rx='5' fill='%23ffd23f'/%3E%3Crect x='114' y='66' width='36' height='36' rx='5' fill='%23f0564a'/%3E%3Crect x='72' y='108' width='36' height='36' rx='5' fill='%23b06ae0'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='36' fill='%2310131a'/%3E%3Crect x='30' y='66' width='36' height='36' rx='5' fill='%233ec6e0'/%3E%3Crect x='72' y='66' width='36' height='36' rx='5' fill='%23ffd23f'/%3E%3Crect x='114' y='66' width='36' height='36' rx='5' fill='%23f0564a'/%3E%3Crect x='72' y='108' width='36' height='36' rx='5' fill='%23b06ae0'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#10131a;
+    --panel:#1a1f2b;
+    --line:#2a3145;
+    --ink:#e8ecf4;
+    --dim:#7d879e;
+    --accent:#ffb800;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Segoe UI",system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    touch-action:none;
+    user-select:none;-webkit-user-select:none;
+  }
+  header{
+    display:flex;align-items:baseline;gap:10px;margin-bottom:8px;
+  }
+  header h1{
+    font-size:20px;letter-spacing:8px;font-weight:800;color:var(--ink);
+  }
+  header span{font-size:10px;letter-spacing:2px;color:var(--dim)}
+  .layout{display:flex;gap:10px;align-items:flex-start}
+  canvas#board{
+    background:#0b0e14;
+    border:1px solid var(--line);
+    border-radius:6px;
+    display:block;
+  }
+  .side{display:flex;flex-direction:column;gap:8px;width:96px}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    padding:8px;text-align:center;
+  }
+  .card .label{font-size:9px;letter-spacing:2px;color:var(--dim);margin-bottom:4px}
+  .card .value{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+  canvas.mini{display:block;margin:0 auto;background:transparent}
+  .controls{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+    margin-top:12px;width:100%;max-width:400px;padding:0 12px;
+  }
+  .btn{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    color:var(--ink);font-size:20px;padding:14px 0;text-align:center;
+    font-weight:700;cursor:pointer;
+  }
+  .btn:active{background:var(--line)}
+  .btn.wide{grid-column:span 2}
+  .overlay{
+    position:fixed;inset:0;background:rgba(11,14,20,.86);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    z-index:10;
+  }
+  .overlay h2{font-size:22px;letter-spacing:6px}
+  .overlay p{color:var(--dim);font-size:13px;text-align:center;line-height:1.6;padding:0 24px}
+  .overlay .go{
+    background:var(--accent);color:#111;border:none;border-radius:8px;
+    padding:12px 34px;font-size:15px;font-weight:800;letter-spacing:2px;cursor:pointer;
+  }
+  .hidden{display:none}
+  @media (min-height:760px){
+    header h1{font-size:26px}
+  }
+</style>
+</head>
+<body>
+
+<header><h1>TETRIS</h1><span id="hiscore">RECORD 0</span></header>
+
+<div class="layout">
+  <canvas id="board"></canvas>
+  <div class="side">
+    <div class="card"><div class="label">SCORE</div><div class="value" id="score">0</div></div>
+    <div class="card"><div class="label">LIGNES</div><div class="value" id="lines">0</div></div>
+    <div class="card"><div class="label">NIVEAU</div><div class="value" id="level">1</div></div>
+    <div class="card"><div class="label">SUIVANT</div><canvas class="mini" id="next" width="72" height="72"></canvas></div>
+    <div class="card"><div class="label">RÉSERVE</div><canvas class="mini" id="hold" width="72" height="72"></canvas></div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="btn" id="bLeft">◀</div>
+  <div class="btn" id="bRight">▶</div>
+  <div class="btn" id="bRot">⟳</div>
+  <div class="btn" id="bHold">H</div>
+  <div class="btn wide" id="bDown">▼ DESCENTE</div>
+  <div class="btn wide" id="bDrop">⤓ CHUTE</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <h2 id="ovTitle">TETRIS</h2>
+  <p id="ovText">Flèches ou boutons pour jouer.<br>↑ ou ⟳ pour pivoter, Espace pour la chute directe, C ou H pour la réserve, P pour pause.<br>Glisse aussi ton doigt sur la grille : gauche/droite pour déplacer, bas pour descendre, tape pour pivoter.</p>
+  <button class="go" id="ovBtn">JOUER</button>
+</div>
+
+<script>
+(() => {
+  const COLS = 10, ROWS = 20;
+  const boardCv = document.getElementById('board');
+  const bctx = boardCv.getContext('2d');
+  const nextCv = document.getElementById('next'), nctx = nextCv.getContext('2d');
+  const holdCv = document.getElementById('hold'), hctx = holdCv.getContext('2d');
+
+  // Taille adaptative
+  const maxH = Math.min(window.innerHeight - 220, 560);
+  const cell = Math.max(16, Math.floor(maxH / ROWS));
+  boardCv.width = COLS * cell;
+  boardCv.height = ROWS * cell;
+
+  const SHAPES = {
+    I:[[0,1],[1,1],[2,1],[3,1]],
+    O:[[1,0],[2,0],[1,1],[2,1]],
+    T:[[1,0],[0,1],[1,1],[2,1]],
+    S:[[1,0],[2,0],[0,1],[1,1]],
+    Z:[[0,0],[1,0],[1,1],[2,1]],
+    J:[[0,0],[0,1],[1,1],[2,1]],
+    L:[[2,0],[0,1],[1,1],[2,1]]
+  };
+  const COLORS = {
+    I:'#3ec6e0', O:'#ffd23f', T:'#b06ae0',
+    S:'#5fd068', Z:'#f0564a', J:'#4a7bf0', L:'#f09a3e'
+  };
+
+  let grid, cur, next, hold, canHold;
+  let score, lines, level, dropInterval, dropTimer;
+  let playing = false, paused = false, over = false;
+  let hiscore = 0;
+  try {
+    hiscore = parseInt(localStorage.getItem('tetris_record') || '0', 10);
+    document.getElementById('hiscore').textContent = 'RECORD ' + hiscore;
+  } catch (e) {}
+
+  const $ = id => document.getElementById(id);
+
+  function newBag() {
+    const keys = Object.keys(SHAPES);
+    for (let i = keys.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [keys[i], keys[j]] = [keys[j], keys[i]];
+    }
+    return keys;
+  }
+  let bag = [];
+  function pull() {
+    if (bag.length === 0) bag = newBag();
+    return bag.pop();
+  }
+
+  function spawn(type) {
+    const cells = SHAPES[type].map(([x,y]) => [x,y]);
+    return { type, cells, x: 3, y: type === 'I' ? -1 : 0 };
+  }
+
+  function collides(p, dx=0, dy=0, cells=null) {
+    const cs = cells || p.cells;
+    return cs.some(([cx,cy]) => {
+      const x = p.x + cx + dx, y = p.y + cy + dy;
+      if (x < 0 || x >= COLS || y >= ROWS) return true;
+      if (y >= 0 && grid[y][x]) return true;
+      return false;
+    });
+  }
+
+  function rotate(p) {
+    if (p.type === 'O') return;
+    // rotation autour d'un pivot 4x4 pour I, 3x3 pour le reste
+    const size = p.type === 'I' ? 4 : 3;
+    const rotated = p.cells.map(([x,y]) => [size - 1 - y, x]);
+    // essais de décalage (wall kicks simples)
+    for (const k of [0, -1, 1, -2, 2]) {
+      if (!collides(p, k, 0, rotated)) {
+        p.cells = rotated;
+        p.x += k;
+        return;
+      }
+    }
+  }
+
+  function merge() {
+    cur.cells.forEach(([cx,cy]) => {
+      const y = cur.y + cy, x = cur.x + cx;
+      if (y >= 0) grid[y][x] = cur.type;
+    });
+  }
+
+  function clearLines() {
+    let cleared = 0;
+    for (let y = ROWS - 1; y >= 0; y--) {
+      if (grid[y].every(c => c)) {
+        grid.splice(y, 1);
+        grid.unshift(Array(COLS).fill(null));
+        cleared++;
+        y++;
+      }
+    }
+    if (cleared) {
+      const pts = [0, 100, 300, 500, 800][cleared] * level;
+      score += pts;
+      lines += cleared;
+      const newLevel = Math.floor(lines / 10) + 1;
+      if (newLevel !== level) {
+        level = newLevel;
+        dropInterval = Math.max(80, 1000 - (level - 1) * 85);
+      }
+      updateHud();
+    }
+  }
+
+  function lockPiece() {
+    merge();
+    clearLines();
+    cur = next;
+    next = spawn(pull());
+    canHold = true;
+    drawMini(nctx, next.type);
+    if (collides(cur)) gameOver();
+  }
+
+  function softDrop() {
+    if (!collides(cur, 0, 1)) { cur.y++; score += 1; updateHud(); }
+    else lockPiece();
+  }
+
+  function hardDrop() {
+    let d = 0;
+    while (!collides(cur, 0, 1)) { cur.y++; d++; }
+    score += d * 2;
+    updateHud();
+    lockPiece();
+  }
+
+  function move(dx) {
+    if (!collides(cur, dx, 0)) cur.x += dx;
+  }
+
+  function doHold() {
+    if (!canHold) return;
+    canHold = false;
+    if (hold) {
+      const t = hold;
+      hold = cur.type;
+      cur = spawn(t);
+    } else {
+      hold = cur.type;
+      cur = next;
+      next = spawn(pull());
+      drawMini(nctx, next.type);
+    }
+    drawMini(hctx, hold);
+  }
+
+  function ghostY() {
+    let gy = cur.y;
+    while (!collides(cur, 0, gy - cur.y + 1)) gy++;
+    return gy;
+  }
+
+  function drawCell(ctx, x, y, size, color, ghost=false) {
+    const px = x * size, py = y * size;
+    if (ghost) {
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = 0.35;
+      ctx.strokeRect(px + 1.5, py + 1.5, size - 3, size - 3);
+      ctx.globalAlpha = 1;
+      return;
+    }
+    ctx.fillStyle = color;
+    ctx.fillRect(px + 1, py + 1, size - 2, size - 2);
+    // reflet haut
+    ctx.fillStyle = 'rgba(255,255,255,.22)';
+    ctx.fillRect(px + 1, py + 1, size - 2, 3);
+    // ombre bas
+    ctx.fillStyle = 'rgba(0,0,0,.28)';
+    ctx.fillRect(px + 1, py + size - 4, size - 2, 3);
+  }
+
+  function draw() {
+    bctx.clearRect(0, 0, boardCv.width, boardCv.height);
+    // grille discrète
+    bctx.strokeStyle = 'rgba(255,255,255,.04)';
+    for (let x = 1; x < COLS; x++) {
+      bctx.beginPath(); bctx.moveTo(x*cell, 0); bctx.lineTo(x*cell, ROWS*cell); bctx.stroke();
+    }
+    for (let y = 1; y < ROWS; y++) {
+      bctx.beginPath(); bctx.moveTo(0, y*cell); bctx.lineTo(COLS*cell, y*cell); bctx.stroke();
+    }
+    // pièces posées
+    for (let y = 0; y < ROWS; y++)
+      for (let x = 0; x < COLS; x++)
+        if (grid[y][x]) drawCell(bctx, x, y, cell, COLORS[grid[y][x]]);
+    if (cur) {
+      // fantôme
+      const gy = ghostY();
+      cur.cells.forEach(([cx,cy]) => {
+        if (cur.y + cy >= 0 || gy + cy >= 0)
+          drawCell(bctx, cur.x + cx, gy + cy, cell, COLORS[cur.type], true);
+      });
+      // pièce active
+      cur.cells.forEach(([cx,cy]) => {
+        if (cur.y + cy >= 0)
+          drawCell(bctx, cur.x + cx, cur.y + cy, cell, COLORS[cur.type]);
+      });
+    }
+  }
+
+  function drawMini(ctx, type) {
+    ctx.clearRect(0, 0, 72, 72);
+    if (!type) return;
+    const cells = SHAPES[type];
+    const xs = cells.map(c => c[0]), ys = cells.map(c => c[1]);
+    const w = Math.max(...xs) - Math.min(...xs) + 1;
+    const h = Math.max(...ys) - Math.min(...ys) + 1;
+    const s = 16;
+    const ox = (72 - w * s) / 2 - Math.min(...xs) * s;
+    const oy = (72 - h * s) / 2 - Math.min(...ys) * s;
+    cells.forEach(([x,y]) => {
+      ctx.fillStyle = COLORS[type];
+      ctx.fillRect(ox + x*s + 1, oy + y*s + 1, s - 2, s - 2);
+      ctx.fillStyle = 'rgba(255,255,255,.22)';
+      ctx.fillRect(ox + x*s + 1, oy + y*s + 1, s - 2, 2);
+    });
+  }
+
+  function updateHud() {
+    $('score').textContent = score;
+    $('lines').textContent = lines;
+    $('level').textContent = level;
+    if (score > hiscore) {
+      hiscore = score;
+      $('hiscore').textContent = 'RECORD ' + hiscore;
+      try { localStorage.setItem('tetris_record', String(hiscore)); } catch (e) {}
+    }
+  }
+
+  let lastTime = 0, acc = 0;
+  function loop(t) {
+    if (!playing) return;
+    if (!paused && !over) {
+      const dt = t - lastTime;
+      acc += dt;
+      if (acc > dropInterval) {
+        acc = 0;
+        if (!collides(cur, 0, 1)) cur.y++;
+        else lockPiece();
+      }
+      draw();
+    }
+    lastTime = t;
+    requestAnimationFrame(loop);
+  }
+
+  function start() {
+    grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
+    bag = [];
+    score = 0; lines = 0; level = 1;
+    dropInterval = 1000;
+    cur = spawn(pull());
+    next = spawn(pull());
+    hold = null; canHold = true;
+    over = false; paused = false; playing = true;
+    drawMini(nctx, next.type);
+    drawMini(hctx, null);
+    updateHud();
+    $('overlay').classList.add('hidden');
+    lastTime = performance.now(); acc = 0;
+    requestAnimationFrame(loop);
+  }
+
+  function gameOver() {
+    over = true; playing = false;
+    $('ovTitle').textContent = 'PERDU';
+    $('ovText').innerHTML = 'Score final : <b>' + score + '</b><br>Lignes : ' + lines + ' · Niveau : ' + level;
+    $('ovBtn').textContent = 'REJOUER';
+    $('overlay').classList.remove('hidden');
+  }
+
+  function togglePause() {
+    if (!playing || over) return;
+    paused = !paused;
+    if (paused) {
+      $('ovTitle').textContent = 'PAUSE';
+      $('ovText').textContent = 'Appuie sur P ou le bouton pour reprendre.';
+      $('ovBtn').textContent = 'REPRENDRE';
+      $('overlay').classList.remove('hidden');
+    } else {
+      $('overlay').classList.add('hidden');
+      acc = 0; lastTime = performance.now();
+    }
+  }
+
+  $('ovBtn').addEventListener('click', () => {
+    if (paused) togglePause();
+    else start();
+  });
+
+  // Clavier
+  document.addEventListener('keydown', e => {
+    if (!playing || over) return;
+    if (e.key === 'p' || e.key === 'P') { togglePause(); return; }
+    if (paused) return;
+    switch (e.key) {
+      case 'ArrowLeft': move(-1); break;
+      case 'ArrowRight': move(1); break;
+      case 'ArrowDown': softDrop(); break;
+      case 'ArrowUp': rotate(cur); break;
+      case ' ': e.preventDefault(); hardDrop(); break;
+      case 'c': case 'C': case 'h': case 'H': doHold(); break;
+    }
+    draw();
+  });
+
+  // Boutons tactiles avec répétition sur maintien
+  function bindBtn(id, fn, repeat=false) {
+    const el = $(id);
+    let iv = null;
+    const press = e => {
+      e.preventDefault();
+      if (!playing || paused || over) return;
+      fn(); draw();
+      if (repeat) iv = setInterval(() => { fn(); draw(); }, 110);
+    };
+    const release = () => { if (iv) { clearInterval(iv); iv = null; } };
+    el.addEventListener('touchstart', press, {passive:false});
+    el.addEventListener('touchend', release);
+    el.addEventListener('touchcancel', release);
+    el.addEventListener('mousedown', press);
+    el.addEventListener('mouseup', release);
+    el.addEventListener('mouseleave', release);
+  }
+  bindBtn('bLeft', () => move(-1), true);
+  bindBtn('bRight', () => move(1), true);
+  bindBtn('bDown', softDrop, true);
+  bindBtn('bRot', () => rotate(cur));
+  bindBtn('bDrop', hardDrop);
+  bindBtn('bHold', doHold);
+
+  // Gestes sur la grille : swipe et tap
+  let tsX=0, tsY=0, tsT=0, moved=false;
+  boardCv.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    tsX = t.clientX; tsY = t.clientY; tsT = Date.now(); moved = false;
+  }, {passive:true});
+  boardCv.addEventListener('touchmove', e => {
+    if (!playing || paused || over) return;
+    const t = e.touches[0];
+    const dx = t.clientX - tsX, dy = t.clientY - tsY;
+    if (Math.abs(dx) > cell) {
+      move(dx > 0 ? 1 : -1);
+      tsX = t.clientX; moved = true; draw();
+    } else if (dy > cell) {
+      softDrop();
+      tsY = t.clientY; moved = true; draw();
+    }
+  }, {passive:true});
+  boardCv.addEventListener('touchend', e => {
+    if (!playing || paused || over) return;
+    if (!moved && Date.now() - tsT < 250) { rotate(cur); draw(); }
+  });
+
+  draw();
+})();
+</script>
+</body>
+</html>
